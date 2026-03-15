@@ -1,0 +1,19 @@
+{
+  "app_name": "diskf0rm4th",
+  "select_drive": "Select Drive",
+  "burn_iso": "Burn ISO",
+  "format_disk": "Format Disk",
+  "language_selection": "Language",
+  "status_ready": "Ready",
+  "status_burning": "Burning...",
+  "status_formatting": "Formatting...",
+  "status_done": "Done",
+  "error_no_drive": "No drive selected",
+  "error_no_iso": "No ISO selected",
+  "pro_features": "Pro Features",
+  "cloud_iso": "Cloud ISO Fetch",
+  "smart_monitor": "S.M.A.R.T. Monitor",
+  "multi_drive": "Multi-Drive Burn",
+  "script_inject": "Script Inject",
+  "hash_verify": "Hash Verify"
+}

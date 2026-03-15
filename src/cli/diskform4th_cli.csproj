@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <AssemblyName>diskform4th_cli</AssemblyName>
+    <RootNamespace>diskform4th.CLI</RootNamespace>
+  </PropertyGroup>
+
+  <!-- Needs PowerShell standard library to build cmdlets -->
+  <ItemGroup>
+    <PackageReference Include="PowerShellStandard.Library" Version="5.1.1" />
+  </ItemGroup>
+
+  <!-- Ensure CLI has access to LocalizationManager (extracting it from UI might be better long-term, but this connects it for now) -->
+  <ItemGroup>
+    <Compile Include="..\ui\LocalizationManager.cs" Link="LocalizationManager.cs" />
+  </ItemGroup>
+
+  <!-- Include localizations so they are copied to output -->
+  <ItemGroup>
+    <Content Include="..\..\locales\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>locales\%(Filename)%(Extension)</Link>
+    </Content>
+  </ItemGroup>
+
+</Project>

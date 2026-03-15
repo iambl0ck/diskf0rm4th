@@ -1,0 +1,110 @@
+<Window x:Class="diskform4th.UI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{Binding LocalizedStrings[app_name]}" Height="450" Width="400"
+        Background="#1E1E1E" Foreground="White" WindowStyle="None" ResizeMode="CanMinimize"
+        WindowStartupLocation="CenterScreen">
+
+    <Window.Resources>
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="#0078D7"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <!-- Add corner radius for Windows 11 Fluent look -->
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="Padding" Value="5"/>
+            <Setter Property="Background" Value="#2D2D30"/>
+            <Setter Property="Foreground" Value="Black"/>
+        </Style>
+        <Style TargetType="TextBlock">
+            <Setter Property="Margin" Value="5,10,5,2"/>
+            <Setter Property="Foreground" Value="#CCCCCC"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- Header / Title Bar -->
+            <RowDefinition Height="Auto"/> <!-- Drive Selection -->
+            <RowDefinition Height="Auto"/> <!-- ISO Selection -->
+            <RowDefinition Height="Auto"/> <!-- Pro Features -->
+            <RowDefinition Height="*"/>    <!-- Spacer -->
+            <RowDefinition Height="Auto"/> <!-- Status & Actions -->
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Grid Grid.Row="0" Margin="0,0,0,15">
+            <TextBlock Text="{Binding LocalizedStrings[app_name]}" FontSize="24" FontWeight="Bold" Foreground="White" Margin="0"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <TextBlock Text="{Binding LocalizedStrings[language_selection]}" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                <ComboBox x:Name="LanguageComboBox" Width="60" SelectionChanged="LanguageComboBox_SelectionChanged">
+                    <ComboBoxItem Content="EN" Tag="en"/>
+                    <ComboBoxItem Content="TR" Tag="tr"/>
+                </ComboBox>
+            </StackPanel>
+        </Grid>
+
+        <!-- Drive Selection -->
+        <StackPanel Grid.Row="1">
+            <TextBlock Text="{Binding LocalizedStrings[select_drive]}"/>
+            <ComboBox x:Name="DriveComboBox" Height="30">
+                <ComboBoxItem Content="E: [USB Disk] (32 GB)"/>
+            </ComboBox>
+        </StackPanel>
+
+        <!-- ISO Selection -->
+        <StackPanel Grid.Row="2" Margin="0,10,0,0">
+            <TextBlock Text="{Binding LocalizedStrings[burn_iso]}"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="IsoPathTextBox" Grid.Column="0" Height="30" IsReadOnly="True" Background="#2D2D30" Foreground="White" VerticalContentAlignment="Center" Padding="5,0"/>
+                <Button Grid.Column="1" Content="..." Width="40" Height="30" Margin="5,0,0,0" Click="SelectIsoButton_Click"/>
+            </Grid>
+        </StackPanel>
+
+        <!-- Pro Features (Checkboxes) -->
+        <StackPanel Grid.Row="3" Margin="0,15,0,0">
+            <TextBlock Text="{Binding LocalizedStrings[pro_features]}"/>
+            <UniformGrid Columns="2" Margin="5">
+                <CheckBox Content="{Binding LocalizedStrings[cloud_iso]}" Foreground="White" Margin="0,5"/>
+                <CheckBox Content="{Binding LocalizedStrings[smart_monitor]}" Foreground="White" Margin="0,5" IsChecked="True"/>
+                <CheckBox Content="{Binding LocalizedStrings[multi_drive]}" Foreground="White" Margin="0,5"/>
+                <CheckBox Content="{Binding LocalizedStrings[script_inject]}" Foreground="White" Margin="0,5"/>
+                <CheckBox Content="{Binding LocalizedStrings[hash_verify]}" Foreground="White" Margin="0,5"/>
+            </UniformGrid>
+        </StackPanel>
+
+        <!-- Status & Actions -->
+        <Grid Grid.Row="5" Margin="0,15,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock x:Name="StatusTextBlock" Grid.Column="0" Text="{Binding LocalizedStrings[status_ready]}" VerticalAlignment="Center" Foreground="#888888"/>
+
+            <Button Grid.Column="1" Content="{Binding LocalizedStrings[format_disk]}" Width="120" Height="35" Background="#333333" Click="FormatButton_Click"/>
+            <Button Grid.Column="2" Content="{Binding LocalizedStrings[burn_iso]}" Width="120" Height="35" Click="BurnButton_Click"/>
+        </Grid>
+    </Grid>
+</Window>

@@ -11,7 +11,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "Linux")
 endif()
 
 # Core library
-add_library(diskform4th_core STATIC src/core/io_buffer.cpp)
+add_library(diskform4th_core SHARED src/core/io_buffer.cpp src/core/c_api.cpp)
 target_include_directories(diskform4th_core PUBLIC src/core)
 
 if (CMAKE_SYSTEM_NAME MATCHES "Linux")
