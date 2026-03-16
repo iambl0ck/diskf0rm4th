@@ -26,8 +26,6 @@ namespace diskform4th.CLI
             // Define a simple callback that writes to the console
             CoreEngineWrapper.ProgressCallback callback = (percentage, speed, remaining, temp, healthy) =>
             {
-                // In a real PowerShell cmdlet, WriteProgress would be used here.
-                // For simplicity, we just print the percentage if it's a multiple of 25.
                 if (percentage % 25 == 0)
                 {
                     WriteObject($"Progress: {percentage}%");
@@ -56,6 +54,18 @@ namespace diskform4th.CLI
         [Parameter(Mandatory = false, HelpMessage = "Language for CLI output (en/tr)")]
         public string Language { get; set; } = "en";
 
+        [Parameter(Mandatory = false, HelpMessage = "Pre-load ISO to RAM before writing")]
+        public SwitchParameter PreloadRam { get; set; }
+
+        [Parameter(Mandatory = false, HelpMessage = "Perform a DoD 3-Pass wipe before writing")]
+        public SwitchParameter SecureErase { get; set; }
+
+        [Parameter(Mandatory = false, HelpMessage = "Encrypt remaining free space (BitLocker/LUKS)")]
+        public SwitchParameter EncryptSpace { get; set; }
+
+        [Parameter(Mandatory = false, HelpMessage = "Create persistent partition (casper-rw)")]
+        public SwitchParameter Persistence { get; set; }
+
         protected override void ProcessRecord()
         {
             diskform4th.UI.LocalizationManager.Instance.SetLanguage(Language);
@@ -66,14 +76,13 @@ namespace diskform4th.CLI
             // Define a simple callback that writes to the console
             CoreEngineWrapper.ProgressCallback callback = (percentage, speed, remaining, temp, healthy) =>
             {
-                // In a real PowerShell cmdlet, WriteProgress would be used here.
                 if (percentage % 25 == 0)
                 {
                     WriteObject($"Progress: {percentage}% - {speed:F1} MB/s (Temp: {temp}C)");
                 }
             };
 
-            int result = CoreEngineWrapper.WriteIsoAsync(TargetDrive, IsoPath, false, SmartMonitor.IsPresent, false, callback);
+            int result = CoreEngineWrapper.WriteIsoAsync(TargetDrive, IsoPath, false, SmartMonitor.IsPresent, false, PreloadRam.IsPresent, SecureErase.IsPresent, EncryptSpace.IsPresent, Persistence.IsPresent, callback);
 
             if (result == 0) WriteObject(loc["status_done"]);
             else WriteError(new ErrorRecord(new Exception("Write failed"), "WriteError", ErrorCategory.WriteError, TargetDrive));
@@ -89,9 +98,12 @@ namespace diskform4th.CLI
         public delegate void ProgressCallback(int percentage, double speedMbPs, int remainingSeconds, int temperature, bool healthy);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        public static extern int WriteIsoAsync(string target, string isoPath, bool isIsoMode, bool smartMonitor, bool verifyBlocks, ProgressCallback callback);
+        public static extern int WriteIsoAsync(string target, string isoPath, bool isIsoMode, bool smartMonitor, bool verifyBlocks, bool preLoadRam, bool secureErase, bool encryptSpace, bool persistence, ProgressCallback callback);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         public static extern int FormatDisk(string target, bool quick, ProgressCallback callback);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        public static extern int StartPxeServer(string isoPath, ProgressCallback callback);
     }
 }

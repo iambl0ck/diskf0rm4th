@@ -61,8 +61,18 @@ void progress_callback(int percentage, double speed, int remaining, int temp, bo
 
     std::string temp_color = temp >= 60 ? RED : GREEN;
 
-    if (speed < 0.0) {
+    if (speed == -1.0) {
         printf("%s VERIFYING | %s ETA: %02d:%02d | %s Temp: %dC %s", YELLOW.c_str(), RED.c_str(), mins, secs, temp_color.c_str(), temp, RESET.c_str());
+    } else if (speed == -2.0) {
+        printf("%s CACHING RAM... | %s Temp: %dC %s", CYAN.c_str(), temp_color.c_str(), temp, RESET.c_str());
+    } else if (speed == -3.0) {
+        printf("%s SECURE ERASE (DoD) | %s Temp: %dC %s", RED.c_str(), temp_color.c_str(), temp, RESET.c_str());
+    } else if (speed == -4.0) {
+        printf("%s ENCRYPTING SPACE... | %s Temp: %dC %s", CYAN.c_str(), temp_color.c_str(), temp, RESET.c_str());
+    } else if (speed == -5.0) {
+        printf("%s PERSISTENT CASPER-RW... | %s Temp: %dC %s", YELLOW.c_str(), temp_color.c_str(), temp, RESET.c_str());
+    } else if (speed == -6.0) {
+        printf("%s PXE SERVING... %s", BOLD.c_str(), RESET.c_str());
     } else {
         printf("%s %.1f MB/s | %s ETA: %02d:%02d | %s Temp: %dC %s", YELLOW.c_str(), speed, RED.c_str(), mins, secs, temp_color.c_str(), temp, RESET.c_str());
     }
@@ -77,8 +87,9 @@ void progress_callback(int percentage, double speed, int remaining, int temp, bo
 #endif
 
 extern "C" {
-    IMPORT int WriteIsoAsync(const char* target, const char* isoPath, bool isIsoMode, bool smartMonitor, bool verifyBlocks, void (*callback)(int, double, int, int, bool));
+    IMPORT int WriteIsoAsync(const char* target, const char* isoPath, bool isIsoMode, bool smartMonitor, bool verifyBlocks, bool preLoadRam, bool secureErase, bool encryptSpace, bool persistence, void (*callback)(int, double, int, int, bool));
     IMPORT int FormatDisk(const char* target, bool quick, void (*callback)(int, double, int, int, bool));
+    IMPORT int StartPxeServer(const char* isoPath, void (*callback)(int, double, int, int, bool));
 }
 
 int main(int argc, char* argv[]) {
@@ -95,6 +106,12 @@ int main(int argc, char* argv[]) {
     std::string iso = "";
     std::string fetch_url = "";
 
+    bool preload = false;
+    bool wipe = false;
+    bool encrypt = false;
+    bool persist = false;
+    bool pxe = false;
+
     // Simple arg parsing
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -106,7 +123,24 @@ int main(int argc, char* argv[]) {
             device = argv[++i];
         } else if (arg == "--iso" && i + 1 < argc) {
             iso = argv[++i];
+        } else if (arg == "--preload") {
+            preload = true;
+        } else if (arg == "--wipe") {
+            wipe = true;
+        } else if (arg == "--encrypt") {
+            encrypt = true;
+        } else if (arg == "--persist") {
+            persist = true;
+        } else if (arg == "--pxe") {
+            pxe = true;
         }
+    }
+
+    if (pxe && !iso.empty()) {
+        std::cout << BOLD << GREEN << "diskf0rm4th Native CLI v1.0 [PXE SERVER]" << RESET << "\n";
+        StartPxeServer(iso.c_str(), progress_callback);
+        std::cout << "\n\n" << BOLD << GREEN << "Server Stopped." << RESET << "\n";
+        return 0;
     }
 
     if (device.empty()) {
@@ -155,7 +189,7 @@ int main(int argc, char* argv[]) {
 
     // Call the shared library
     // Use DD mode (false) by default for Linux CLI since it's typically used for ISOHybrid images
-    WriteIsoAsync(device.c_str(), iso.c_str(), false, true, true, progress_callback);
+    WriteIsoAsync(device.c_str(), iso.c_str(), false, true, true, preload, wipe, encrypt, persist, progress_callback);
 
     std::cout << "\n\n" << BOLD << GREEN << get_localized_string("status_done", locale) << "!" << RESET << "\n";
     return 0;
