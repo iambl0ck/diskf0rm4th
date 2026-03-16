@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/diskform4th_cli.dir/src/cli/main.cpp.o -o diskform4th_cli  -Wl,-rpath,/app/build libdiskform4th_core.so -luring

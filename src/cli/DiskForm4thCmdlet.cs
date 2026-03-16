@@ -22,8 +22,21 @@ namespace diskform4th.CLI
             var loc = diskform4th.UI.LocalizationManager.Instance;
 
             WriteObject($"{loc["status_formatting"]} {DriveLetter}...");
-            // TODO: Call C++ Core Engine via P/Invoke
-            // Example: CoreEngineWrapper.FormatDisk(DriveLetter, Quick.IsPresent);
+
+            // Define a simple callback that writes to the console
+            CoreEngineWrapper.ProgressCallback callback = (percentage, speed, remaining) =>
+            {
+                // In a real PowerShell cmdlet, WriteProgress would be used here.
+                // For simplicity, we just print the percentage if it's a multiple of 25.
+                if (percentage % 25 == 0)
+                {
+                    WriteObject($"Progress: {percentage}%");
+                }
+            };
+
+            // Call C++ Core Engine via P/Invoke
+            CoreEngineWrapper.FormatDisk(DriveLetter, Quick.IsPresent, callback);
+
             WriteObject($"{loc["status_done"]}.");
         }
     }
@@ -50,12 +63,20 @@ namespace diskform4th.CLI
 
             WriteObject($"{loc["status_burning"]} {IsoPath} -> {TargetDrive}...");
 
-            // P/Invoke wrapper example
-            // int result = CoreEngineWrapper.WriteIsoAsync(TargetDrive, IsoPath, SmartMonitor.IsPresent);
-            // if (result == 0) WriteObject(loc["status_done"]);
-            // else WriteError(new ErrorRecord(new Exception("Write failed"), "WriteError", ErrorCategory.WriteError, TargetDrive));
+            // Define a simple callback that writes to the console
+            CoreEngineWrapper.ProgressCallback callback = (percentage, speed, remaining) =>
+            {
+                // In a real PowerShell cmdlet, WriteProgress would be used here.
+                if (percentage % 25 == 0)
+                {
+                    WriteObject($"Progress: {percentage}% - {speed:F1} MB/s");
+                }
+            };
 
-            WriteObject($"{loc["status_done"]} (mock).");
+            int result = CoreEngineWrapper.WriteIsoAsync(TargetDrive, IsoPath, SmartMonitor.IsPresent, callback);
+
+            if (result == 0) WriteObject(loc["status_done"]);
+            else WriteError(new ErrorRecord(new Exception("Write failed"), "WriteError", ErrorCategory.WriteError, TargetDrive));
         }
     }
 
@@ -64,12 +85,13 @@ namespace diskform4th.CLI
     {
         private const string DllName = "diskform4th_core.dll";
 
-        // Example C++ export: extern "C" __declspec(dllexport) int write_iso(const char* target, const char* iso_path, bool smart_monitor);
-        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        public static extern int WriteIsoAsync(string target, string isoPath, bool smartMonitor);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void ProgressCallback(int percentage, double speedMbPs, int remainingSeconds);
 
-        // Example C++ export: extern "C" __declspec(dllexport) int format_disk(const char* target, bool quick);
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        public static extern int FormatDisk(string target, bool quick);
+        public static extern int WriteIsoAsync(string target, string isoPath, bool smartMonitor, ProgressCallback callback);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        public static extern int FormatDisk(string target, bool quick, ProgressCallback callback);
     }
 }

@@ -19,12 +19,6 @@ if (CMAKE_SYSTEM_NAME MATCHES "Linux")
     target_include_directories(diskform4th_core PUBLIC ${LIBURING_INCLUDE_DIRS})
 endif()
 
-# A simple test executable to check compilation
-add_executable(core_test src/core/io_buffer.cpp)
-target_include_directories(core_test PUBLIC src/core)
-if (CMAKE_SYSTEM_NAME MATCHES "Linux")
-    target_link_libraries(core_test PUBLIC ${LIBURING_LIBRARIES})
-endif()
-# Add a dummy main for core_test to compile
-file(WRITE ${CMAKE_BINARY_DIR}/dummy_main.cpp "int main() { return 0; }")
-target_sources(core_test PRIVATE ${CMAKE_BINARY_DIR}/dummy_main.cpp)
+# Linux Native CLI Executable
+add_executable(diskform4th_cli src/cli/main.cpp)
+target_link_libraries(diskform4th_cli PRIVATE diskform4th_core)
