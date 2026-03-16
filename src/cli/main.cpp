@@ -3,6 +3,10 @@
 #include <string>
 #include <thread>
 #include <chrono>
+#if defined(__linux__)
+#include <unistd.h>
+#include <sys/wait.h>
+#endif
 
 // Note: In a real environment, we'd use a JSON library like nlohmann/json.
 // For this prototype, we'll do simple string extraction from the locales files.
@@ -71,16 +75,67 @@ extern "C" {
 }
 
 int main(int argc, char* argv[]) {
+#if defined(__linux__)
+    if (geteuid() != 0) {
+        std::cerr << BOLD << RED << "ERROR: diskf0rm4th requires root privileges to access raw block devices.\n" << RESET;
+        std::cerr << "Please run with sudo.\n";
+        return 1;
+    }
+#endif
+
     std::string locale = "en";
-    std::string device = "/dev/sdb";
-    std::string iso = "ubuntu.iso";
+    std::string device = "";
+    std::string iso = "";
+    std::string fetch_url = "";
 
     // Simple arg parsing
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg == "--lang" && i + 1 < argc) {
             locale = argv[++i];
+        } else if (arg == "--fetch" && i + 1 < argc) {
+            fetch_url = argv[++i];
+        } else if (arg == "--device" && i + 1 < argc) {
+            device = argv[++i];
+        } else if (arg == "--iso" && i + 1 < argc) {
+            iso = argv[++i];
         }
+    }
+
+    if (device.empty()) {
+        std::cerr << BOLD << RED << "ERROR: Target device must be specified with --device (e.g., --device /dev/sdb).\n" << RESET;
+        return 1;
+    }
+
+    if (iso.empty() && fetch_url.empty()) {
+        std::cerr << BOLD << RED << "ERROR: ISO file must be specified with --iso or --fetch.\n" << RESET;
+        return 1;
+    }
+
+    if (!fetch_url.empty()) {
+        std::cout << BOLD << CYAN << "[Cloud Fetch] Downloading ISO from " << fetch_url << "..." << RESET << "\n";
+        iso = "/tmp/diskform4th_cloud.iso";
+
+        // Ensure no command injection by parsing arguments directly instead of system()
+        pid_t pid = fork();
+        if (pid == 0) {
+            execlp("curl", "curl", "-L", "-o", iso.c_str(), fetch_url.c_str(), NULL);
+            // If execlp returns, it failed
+            std::cerr << BOLD << RED << "[Cloud Fetch] Exec failed." << RESET << "\n";
+            exit(1);
+        } else if (pid > 0) {
+            int status;
+            waitpid(pid, &status, 0);
+            if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+                std::cerr << BOLD << RED << "[Cloud Fetch] Download failed." << RESET << "\n";
+                return 1;
+            }
+        } else {
+            std::cerr << BOLD << RED << "[Cloud Fetch] Fork failed." << RESET << "\n";
+            return 1;
+        }
+
+        std::cout << BOLD << GREEN << "[Cloud Fetch] Download complete." << RESET << "\n\n";
     }
 
     std::cout << BOLD << GREEN << "diskf0rm4th Native CLI v1.0" << RESET << "\n";

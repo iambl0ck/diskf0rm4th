@@ -68,6 +68,7 @@
             <RowDefinition Height="Auto"/> <!-- Header / Title Bar -->
             <RowDefinition Height="Auto"/> <!-- Device Selection -->
             <RowDefinition Height="Auto"/> <!-- Boot Selection -->
+            <RowDefinition Height="Auto"/> <!-- Cloud Fetch -->
             <RowDefinition Height="Auto"/> <!-- Format Options -->
             <RowDefinition Height="*"/>    <!-- Spacer -->
             <RowDefinition Height="Auto"/> <!-- Progress & Status -->
@@ -80,10 +81,7 @@
         <!-- Device Selection -->
         <StackPanel Grid.Row="1">
             <TextBlock Text="{Binding LocalizedStrings[select_device]}"/>
-            <ComboBox x:Name="DeviceComboBox">
-                <ComboBoxItem Content="E: [USB Disk] (32 GB) - /dev/sdb"/>
-                <ComboBoxItem Content="F: [External HDD] (1 TB) - /dev/sdc"/>
-            </ComboBox>
+            <ComboBox x:Name="DeviceComboBox"/>
         </StackPanel>
 
         <!-- Boot Selection -->
@@ -99,8 +97,24 @@
             </Grid>
         </StackPanel>
 
-        <!-- Format Options -->
+        <!-- Cloud Fetch -->
         <StackPanel Grid.Row="3">
+            <TextBlock Text="{Binding LocalizedStrings[cloud_iso]}"/>
+            <Grid Margin="0,5,0,15">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <ComboBox x:Name="CloudIsoComboBox" Grid.Column="0" Margin="0" Height="32">
+                    <ComboBoxItem Content="Ubuntu 24.04 Desktop" Tag="https://releases.ubuntu.com/24.04/ubuntu-24.04-desktop-amd64.iso"/>
+                    <ComboBoxItem Content="Alpine Linux 3.19.1" Tag="https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_64/alpine-standard-3.19.1-x86_64.iso"/>
+                </ComboBox>
+                <Button Grid.Column="1" Content="FETCH" Width="70" Height="32" Margin="10,0,0,0" Style="{StaticResource ModernButton}" Click="FetchIsoButton_Click"/>
+            </Grid>
+        </StackPanel>
+
+        <!-- Format Options -->
+        <StackPanel Grid.Row="4">
             <TextBlock Text="{Binding LocalizedStrings[format_options]}" FontSize="16" Foreground="White" Margin="0,10,0,10"/>
 
             <Grid>
@@ -133,7 +147,7 @@
         </StackPanel>
 
         <!-- Progress & Status -->
-        <StackPanel Grid.Row="5" Margin="0,0,0,20">
+        <StackPanel Grid.Row="6" Margin="0,0,0,20">
             <Grid Margin="0,0,0,5">
                 <TextBlock x:Name="StatusTextBlock" Text="{Binding LocalizedStrings[status_ready]}" HorizontalAlignment="Left" Foreground="#888888"/>
                 <TextBlock x:Name="SpeedTextBlock" Text="0 MB/s" HorizontalAlignment="Right" Foreground="#0078D7" FontWeight="Bold"/>
@@ -143,7 +157,7 @@
         </StackPanel>
 
         <!-- Start Button & Language (Bottom Corner) -->
-        <Grid Grid.Row="6">
+        <Grid Grid.Row="7">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>

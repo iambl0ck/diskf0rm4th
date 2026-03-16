@@ -60,7 +60,7 @@ public:
     void close();
 
     // Submits an asynchronous write request
-    bool write_async(IOBuffer& buffer, uint64_t offset);
+    bool write_async(IOBuffer& buffer, uint64_t offset, size_t length = 0);
 
     // Waits for all pending asynchronous operations to complete
     bool flush_and_wait();

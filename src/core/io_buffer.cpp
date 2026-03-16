@@ -184,11 +184,13 @@ void AsyncDiskWriter::close() {
 #endif
 }
 
-bool AsyncDiskWriter::write_async(IOBuffer& buffer, uint64_t offset) {
+bool AsyncDiskWriter::write_async(IOBuffer& buffer, uint64_t offset, size_t length) {
     if (!buffer.get_data()) {
         std::cerr << "Buffer not allocated!" << std::endl;
         return false;
     }
+
+    size_t write_len = length > 0 ? length : buffer.get_size();
 
 #if defined(_WIN32)
     OVERLAPPED* overlapped = new OVERLAPPED;
@@ -202,7 +204,7 @@ bool AsyncDiskWriter::write_async(IOBuffer& buffer, uint64_t offset) {
     BOOL result = WriteFile(
         handle_,
         buffer.get_data(),
-        static_cast<DWORD>(buffer.get_size()),
+        static_cast<DWORD>(write_len),
         &bytes_written,
         overlapped
     );
@@ -228,7 +230,7 @@ bool AsyncDiskWriter::write_async(IOBuffer& buffer, uint64_t offset) {
     }
 
     // Prepare a write operation
-    io_uring_prep_write(sqe, fd_, buffer.get_data(), buffer.get_size(), offset);
+    io_uring_prep_write(sqe, fd_, buffer.get_data(), write_len, offset);
 
     // Tell kernel we have an SQE ready
     int ret = io_uring_submit(ur);
@@ -242,8 +244,8 @@ bool AsyncDiskWriter::write_async(IOBuffer& buffer, uint64_t offset) {
     // Fallback blocking write
     if (fd_ < 0) return false;
     if (lseek(fd_, offset, SEEK_SET) == (off_t)-1) return false;
-    ssize_t written = ::write(fd_, buffer.get_data(), buffer.get_size());
-    return written == buffer.get_size();
+    ssize_t written = ::write(fd_, buffer.get_data(), write_len);
+    return written == write_len;
 #endif
 }
 
@@ -260,12 +262,6 @@ bool AsyncDiskWriter::flush_and_wait() {
         delete overlapped;
     }
     pending_overlapped_.clear();
-
-    if (handle_ != INVALID_HANDLE_VALUE) {
-        if (!FlushFileBuffers(handle_)) {
-            success = false;
-        }
-    }
     return success;
 #elif defined(__linux__)
     if (!ring_) return false;
