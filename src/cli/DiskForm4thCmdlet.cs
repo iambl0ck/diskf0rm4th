@@ -24,7 +24,7 @@ namespace diskform4th.CLI
             WriteObject($"{loc["status_formatting"]} {DriveLetter}...");
 
             // Define a simple callback that writes to the console
-            CoreEngineWrapper.ProgressCallback callback = (percentage, speed, remaining) =>
+            CoreEngineWrapper.ProgressCallback callback = (percentage, speed, remaining, temp, healthy) =>
             {
                 // In a real PowerShell cmdlet, WriteProgress would be used here.
                 // For simplicity, we just print the percentage if it's a multiple of 25.
@@ -64,16 +64,16 @@ namespace diskform4th.CLI
             WriteObject($"{loc["status_burning"]} {IsoPath} -> {TargetDrive}...");
 
             // Define a simple callback that writes to the console
-            CoreEngineWrapper.ProgressCallback callback = (percentage, speed, remaining) =>
+            CoreEngineWrapper.ProgressCallback callback = (percentage, speed, remaining, temp, healthy) =>
             {
                 // In a real PowerShell cmdlet, WriteProgress would be used here.
                 if (percentage % 25 == 0)
                 {
-                    WriteObject($"Progress: {percentage}% - {speed:F1} MB/s");
+                    WriteObject($"Progress: {percentage}% - {speed:F1} MB/s (Temp: {temp}C)");
                 }
             };
 
-            int result = CoreEngineWrapper.WriteIsoAsync(TargetDrive, IsoPath, SmartMonitor.IsPresent, callback);
+            int result = CoreEngineWrapper.WriteIsoAsync(TargetDrive, IsoPath, false, SmartMonitor.IsPresent, false, callback);
 
             if (result == 0) WriteObject(loc["status_done"]);
             else WriteError(new ErrorRecord(new Exception("Write failed"), "WriteError", ErrorCategory.WriteError, TargetDrive));
@@ -86,10 +86,10 @@ namespace diskform4th.CLI
         private const string DllName = "diskform4th_core.dll";
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        public delegate void ProgressCallback(int percentage, double speedMbPs, int remainingSeconds);
+        public delegate void ProgressCallback(int percentage, double speedMbPs, int remainingSeconds, int temperature, bool healthy);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        public static extern int WriteIsoAsync(string target, string isoPath, bool smartMonitor, ProgressCallback callback);
+        public static extern int WriteIsoAsync(string target, string isoPath, bool isIsoMode, bool smartMonitor, bool verifyBlocks, ProgressCallback callback);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         public static extern int FormatDisk(string target, bool quick, ProgressCallback callback);

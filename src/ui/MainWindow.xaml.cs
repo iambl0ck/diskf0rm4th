@@ -17,7 +17,7 @@ namespace diskform4th.UI
 
         // Define delegate for progress callback
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        public delegate void ProgressCallback(int percentage, double speedMbPs, int remainingSeconds);
+        public delegate void ProgressCallback(int percentage, double speedMbPs, int remainingSeconds, int temperature, bool healthy);
 
         public MainWindow()
         {
@@ -145,25 +145,44 @@ namespace diskform4th.UI
             string target = selectedDevice.Split(" - ")[0];
 
             // Define the callback
-            ProgressCallback callback = (percentage, speed, remaining) =>
+            ProgressCallback callback = (percentage, speed, remaining, temp, healthy) =>
             {
                 // Marshal back to UI thread
                 Dispatcher.Invoke(() =>
                 {
                     WriteProgressBar.Value = percentage;
-                    SpeedTextBlock.Text = $"{speed:F1} MB/s";
+
+                    if (speed < 0.0) {
+                        // Special signal for Verification phase
+                        SpeedTextBlock.Text = "VERIFYING...";
+                        SpeedTextBlock.Foreground = System.Windows.Media.Brushes.MediumPurple;
+                    } else {
+                        SpeedTextBlock.Text = $"{speed:F1} MB/s";
+                        SpeedTextBlock.Foreground = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#0078D7"));
+                    }
+
                     TimeSpan time = TimeSpan.FromSeconds(remaining);
                     TimeTextBlock.Text = $"Remaining: {time.Minutes:D2}:{time.Seconds:D2}";
+
+                    // Update S.M.A.R.T. Temperature Display
+                    TempTextBlock.Text = $"{temp}°C";
+                    if (temp >= 60 || !healthy) {
+                        TempTextBlock.Foreground = System.Windows.Media.Brushes.Red;
+                    } else {
+                        TempTextBlock.Foreground = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#0078D7"));
+                    }
                 });
             };
 
             // Run core engine function asynchronously
             string iso = IsoPathTextBox.Text;
+            bool isIsoMode = ImageModeComboBox.SelectedIndex == 0;
+            bool verify = VerifyCheckBox.IsChecked ?? false;
 
             await Task.Run(() =>
             {
                 // Call C-API via P/Invoke with the callback
-                CoreInterop.WriteIsoAsync(target, iso, true, callback);
+                CoreInterop.WriteIsoAsync(target, iso, isIsoMode, true, verify, callback);
             });
 
             StatusTextBlock.Text = LocalizedStrings["status_done"];
@@ -179,7 +198,7 @@ namespace diskform4th.UI
         private const string DllName = "diskform4th_core.dll";
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        public static extern int WriteIsoAsync(string target, string isoPath, bool smartMonitor, MainWindow.ProgressCallback callback);
+        public static extern int WriteIsoAsync(string target, string isoPath, bool isIsoMode, bool smartMonitor, bool verifyBlocks, MainWindow.ProgressCallback callback);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         public static extern int FormatDisk(string target, bool quick, MainWindow.ProgressCallback callback);

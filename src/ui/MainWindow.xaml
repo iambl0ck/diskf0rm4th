@@ -68,6 +68,7 @@
             <RowDefinition Height="Auto"/> <!-- Header / Title Bar -->
             <RowDefinition Height="Auto"/> <!-- Device Selection -->
             <RowDefinition Height="Auto"/> <!-- Boot Selection -->
+            <RowDefinition Height="Auto"/> <!-- Image Mode -->
             <RowDefinition Height="Auto"/> <!-- Cloud Fetch -->
             <RowDefinition Height="Auto"/> <!-- Format Options -->
             <RowDefinition Height="*"/>    <!-- Spacer -->
@@ -76,7 +77,14 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <TextBlock Grid.Row="0" Text="{Binding LocalizedStrings[app_name]}" FontSize="24" FontWeight="Bold" Foreground="White" Margin="0,0,0,20"/>
+        <Grid Grid.Row="0" Margin="0,0,0,20">
+            <TextBlock Text="{Binding LocalizedStrings[app_name]}" FontSize="24" FontWeight="Bold" Foreground="White"/>
+            <!-- S.M.A.R.T Temperature Display -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <TextBlock Text="Drive Temp: " Foreground="#888888" VerticalAlignment="Center"/>
+                <TextBlock x:Name="TempTextBlock" Text="--°C" Foreground="#0078D7" FontWeight="Bold" VerticalAlignment="Center" Margin="5,0,0,0"/>
+            </StackPanel>
+        </Grid>
 
         <!-- Device Selection -->
         <StackPanel Grid.Row="1">
@@ -97,8 +105,17 @@
             </Grid>
         </StackPanel>
 
+        <!-- Image Mode Selection -->
+        <StackPanel Grid.Row="3" Margin="0,5,0,15">
+            <TextBlock Text="Image Mode"/>
+            <ComboBox x:Name="ImageModeComboBox">
+                <ComboBoxItem Content="ISO Image Mode (Recommended)" IsSelected="True" Tag="ISO"/>
+                <ComboBoxItem Content="DD Image Mode" Tag="DD"/>
+            </ComboBox>
+        </StackPanel>
+
         <!-- Cloud Fetch -->
-        <StackPanel Grid.Row="3">
+        <StackPanel Grid.Row="4">
             <TextBlock Text="{Binding LocalizedStrings[cloud_iso]}"/>
             <Grid Margin="0,5,0,15">
                 <Grid.ColumnDefinitions>
@@ -114,7 +131,7 @@
         </StackPanel>
 
         <!-- Format Options -->
-        <StackPanel Grid.Row="4">
+        <StackPanel Grid.Row="5">
             <TextBlock Text="{Binding LocalizedStrings[format_options]}" FontSize="16" Foreground="White" Margin="0,10,0,10"/>
 
             <Grid>
@@ -144,10 +161,12 @@
                     </ComboBox>
                 </StackPanel>
             </Grid>
+
+            <CheckBox x:Name="VerifyCheckBox" Content="Verify Blocks after formatting (SHA-256)" Foreground="White" Margin="0,10,0,0"/>
         </StackPanel>
 
         <!-- Progress & Status -->
-        <StackPanel Grid.Row="6" Margin="0,0,0,20">
+        <StackPanel Grid.Row="7" Margin="0,0,0,20">
             <Grid Margin="0,0,0,5">
                 <TextBlock x:Name="StatusTextBlock" Text="{Binding LocalizedStrings[status_ready]}" HorizontalAlignment="Left" Foreground="#888888"/>
                 <TextBlock x:Name="SpeedTextBlock" Text="0 MB/s" HorizontalAlignment="Right" Foreground="#0078D7" FontWeight="Bold"/>
@@ -157,7 +176,7 @@
         </StackPanel>
 
         <!-- Start Button & Language (Bottom Corner) -->
-        <Grid Grid.Row="7">
+        <Grid Grid.Row="8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>

@@ -43,7 +43,7 @@ const std::string RED     = "\033[31m";
 const std::string CLEAR_L = "\033[2K\r"; // Clear line
 
 // Mocked callback to match C-API
-void progress_callback(int percentage, double speed, int remaining) {
+void progress_callback(int percentage, double speed, int remaining, int temp, bool healthy) {
     int width = 50; // Width of the progress bar
     int pos = width * percentage / 100;
 
@@ -55,10 +55,17 @@ void progress_callback(int percentage, double speed, int remaining) {
     }
     std::cout << "] " << percentage << "% ";
 
-    // Formatting remaining time
+    // Formatting remaining time and temp
     int mins = remaining / 60;
     int secs = remaining % 60;
-    printf("%s %.1f MB/s | %s ETA: %02d:%02d%s", YELLOW.c_str(), speed, RED.c_str(), mins, secs, RESET.c_str());
+
+    std::string temp_color = temp >= 60 ? RED : GREEN;
+
+    if (speed < 0.0) {
+        printf("%s VERIFYING | %s ETA: %02d:%02d | %s Temp: %dC %s", YELLOW.c_str(), RED.c_str(), mins, secs, temp_color.c_str(), temp, RESET.c_str());
+    } else {
+        printf("%s %.1f MB/s | %s ETA: %02d:%02d | %s Temp: %dC %s", YELLOW.c_str(), speed, RED.c_str(), mins, secs, temp_color.c_str(), temp, RESET.c_str());
+    }
     std::cout << std::flush;
 }
 
@@ -70,8 +77,8 @@ void progress_callback(int percentage, double speed, int remaining) {
 #endif
 
 extern "C" {
-    IMPORT int WriteIsoAsync(const char* target, const char* isoPath, bool smartMonitor, void (*callback)(int, double, int));
-    IMPORT int FormatDisk(const char* target, bool quick, void (*callback)(int, double, int));
+    IMPORT int WriteIsoAsync(const char* target, const char* isoPath, bool isIsoMode, bool smartMonitor, bool verifyBlocks, void (*callback)(int, double, int, int, bool));
+    IMPORT int FormatDisk(const char* target, bool quick, void (*callback)(int, double, int, int, bool));
 }
 
 int main(int argc, char* argv[]) {
@@ -147,7 +154,8 @@ int main(int argc, char* argv[]) {
     std::cout << BOLD << YELLOW << get_localized_string("status_burning", locale) << RESET << "\n";
 
     // Call the shared library
-    WriteIsoAsync(device.c_str(), iso.c_str(), true, progress_callback);
+    // Use DD mode (false) by default for Linux CLI since it's typically used for ISOHybrid images
+    WriteIsoAsync(device.c_str(), iso.c_str(), false, true, true, progress_callback);
 
     std::cout << "\n\n" << BOLD << GREEN << get_localized_string("status_done", locale) << "!" << RESET << "\n";
     return 0;
