@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <OutputType>WinExe</OutputType>
+    <StartupObject>diskform4th.UI.App</StartupObject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\locales\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>locales\%(Filename)%(Extension)</Link>
+    </Content>
+  </ItemGroup>
+
+</Project>
