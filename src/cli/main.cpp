@@ -43,7 +43,9 @@ const std::string RED     = "\033[31m";
 const std::string CLEAR_L = "\033[2K\r"; // Clear line
 
 // Mocked callback to match C-API
-void progress_callback(int percentage, double speed, int remaining, int temp, bool healthy) {
+#include "qrcodegen.hpp"
+
+void progress_callback(int percentage, double speed, int remaining, int temp, bool healthy, const char* hashStr) {
     int width = 50; // Width of the progress bar
     int pos = width * percentage / 100;
 
@@ -63,6 +65,23 @@ void progress_callback(int percentage, double speed, int remaining, int temp, bo
 
     if (speed == -1.0) {
         printf("%s VERIFYING | %s ETA: %02d:%02d | %s Temp: %dC %s", YELLOW.c_str(), RED.c_str(), mins, secs, temp_color.c_str(), temp, RESET.c_str());
+    } else if (speed == -1.5) {
+        // Special signal for QR code payload. `remaining` is used to trigger QR logic
+        std::cout << CLEAR_L << BOLD << GREEN << "[Air-Gapped Validation] SHA-256 Hash QR Code:" << RESET << "\n\n";
+        if (hashStr && strlen(hashStr) > 0) {
+            std::string text = std::string("diskf0rm4th_hash:") + hashStr;
+            qrcodegen::QrCode qr = qrcodegen::QrCode::encodeText(text.c_str(), qrcodegen::QrCode::Ecc::LOW);
+
+            int border = 2;
+            for (int y = -border; y < qr.getSize() + border; y++) {
+                for (int x = -border; x < qr.getSize() + border; x++) {
+                    std::cout << (qr.getModule(x, y) ? "██" : "  ");
+                }
+                std::cout << "\n";
+            }
+        }
+        std::cout << "\n" << std::flush;
+        return; // Don't print the standard line
     } else if (speed == -2.0) {
         printf("%s CACHING RAM... | %s Temp: %dC %s", CYAN.c_str(), temp_color.c_str(), temp, RESET.c_str());
     } else if (speed == -3.0) {
