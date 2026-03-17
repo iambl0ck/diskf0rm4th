@@ -87,7 +87,7 @@ void progress_callback(int percentage, double speed, int remaining, int temp, bo
 #endif
 
 extern "C" {
-    IMPORT int WriteIsoAsync(const char* target, const char* isoPath, bool isIsoMode, bool smartMonitor, bool verifyBlocks, bool preLoadRam, bool secureErase, bool encryptSpace, bool persistence, void (*callback)(int, double, int, int, bool));
+    IMPORT int WriteIsoAsync(const char* target, const char* isoPath, bool isIsoMode, bool smartMonitor, bool verifyBlocks, bool preLoadRam, bool secureErase, bool encryptSpace, bool persistence, bool multiBoot, void (*callback)(int, double, int, int, bool));
     IMPORT int FormatDisk(const char* target, bool quick, void (*callback)(int, double, int, int, bool));
     IMPORT int StartPxeServer(const char* isoPath, void (*callback)(int, double, int, int, bool));
 }
@@ -189,7 +189,7 @@ int main(int argc, char* argv[]) {
 
     // Call the shared library
     // Use DD mode (false) by default for Linux CLI since it's typically used for ISOHybrid images
-    WriteIsoAsync(device.c_str(), iso.c_str(), false, true, true, preload, wipe, encrypt, persist, progress_callback);
+    WriteIsoAsync(device.c_str(), iso.c_str(), false, true, true, preload, wipe, encrypt, persist, false, progress_callback);
 
     std::cout << "\n\n" << BOLD << GREEN << get_localized_string("status_done", locale) << "!" << RESET << "\n";
     return 0;

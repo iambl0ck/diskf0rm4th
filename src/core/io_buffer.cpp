@@ -184,6 +184,48 @@ void AsyncDiskWriter::close() {
 #endif
 }
 
+bool AsyncDiskWriter::read_async(IOBuffer& buffer, uint64_t offset, size_t length) {
+    if (!buffer.get_data()) return false;
+    size_t read_len = length > 0 ? length : buffer.get_size();
+
+#if defined(_WIN32)
+    OVERLAPPED* overlapped = new OVERLAPPED;
+    ZeroMemory(overlapped, sizeof(OVERLAPPED));
+    overlapped->Offset = offset & 0xFFFFFFFF;
+    overlapped->OffsetHigh = offset >> 32;
+    overlapped->hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+
+    DWORD bytes_read = 0;
+    BOOL result = ReadFile(handle_, buffer.get_data(), static_cast<DWORD>(read_len), &bytes_read, overlapped);
+
+    if (!result && GetLastError() != ERROR_IO_PENDING) {
+        CloseHandle(overlapped->hEvent);
+        delete overlapped;
+        return false;
+    }
+    pending_overlapped_.push_back(overlapped);
+    return true;
+#elif defined(__linux__)
+    if (fd_ < 0 || !ring_) return false;
+    struct io_uring* ur = static_cast<struct io_uring*>(ring_);
+    struct io_uring_sqe *sqe = io_uring_get_sqe(ur);
+    if (!sqe) return false;
+
+    io_uring_prep_read(sqe, fd_, buffer.get_data(), read_len, offset);
+
+    int ret = io_uring_submit(ur);
+    if (ret < 0) return false;
+
+    pending_ops_++;
+    return true;
+#else
+    if (fd_ < 0) return false;
+    if (lseek(fd_, offset, SEEK_SET) == (off_t)-1) return false;
+    ssize_t read_bytes = ::read(fd_, buffer.get_data(), read_len);
+    return read_bytes == read_len;
+#endif
+}
+
 bool AsyncDiskWriter::write_async(IOBuffer& buffer, uint64_t offset, size_t length) {
     if (!buffer.get_data()) {
         std::cerr << "Buffer not allocated!" << std::endl;

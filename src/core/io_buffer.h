@@ -59,6 +59,9 @@ public:
     bool open();
     void close();
 
+    // Submits an asynchronous read request
+    bool read_async(IOBuffer& buffer, uint64_t offset, size_t length = 0);
+
     // Submits an asynchronous write request
     bool write_async(IOBuffer& buffer, uint64_t offset, size_t length = 0);
 

@@ -23,7 +23,6 @@ namespace diskform4th.CLI
 
             WriteObject($"{loc["status_formatting"]} {DriveLetter}...");
 
-            // Define a simple callback that writes to the console
             CoreEngineWrapper.ProgressCallback callback = (percentage, speed, remaining, temp, healthy) =>
             {
                 if (percentage % 25 == 0)
@@ -32,7 +31,6 @@ namespace diskform4th.CLI
                 }
             };
 
-            // Call C++ Core Engine via P/Invoke
             CoreEngineWrapper.FormatDisk(DriveLetter, Quick.IsPresent, callback);
 
             WriteObject($"{loc["status_done"]}.");
@@ -66,6 +64,9 @@ namespace diskform4th.CLI
         [Parameter(Mandatory = false, HelpMessage = "Create persistent partition (casper-rw)")]
         public SwitchParameter Persistence { get; set; }
 
+        [Parameter(Mandatory = false, HelpMessage = "Enable Multi-Boot Mode (Ventoy Alternative)")]
+        public SwitchParameter MultiBoot { get; set; }
+
         protected override void ProcessRecord()
         {
             diskform4th.UI.LocalizationManager.Instance.SetLanguage(Language);
@@ -73,7 +74,6 @@ namespace diskform4th.CLI
 
             WriteObject($"{loc["status_burning"]} {IsoPath} -> {TargetDrive}...");
 
-            // Define a simple callback that writes to the console
             CoreEngineWrapper.ProgressCallback callback = (percentage, speed, remaining, temp, healthy) =>
             {
                 if (percentage % 25 == 0)
@@ -82,10 +82,25 @@ namespace diskform4th.CLI
                 }
             };
 
-            int result = CoreEngineWrapper.WriteIsoAsync(TargetDrive, IsoPath, false, SmartMonitor.IsPresent, false, PreloadRam.IsPresent, SecureErase.IsPresent, EncryptSpace.IsPresent, Persistence.IsPresent, callback);
+            int result = CoreEngineWrapper.WriteIsoAsync(TargetDrive, IsoPath, false, SmartMonitor.IsPresent, false, PreloadRam.IsPresent, SecureErase.IsPresent, EncryptSpace.IsPresent, Persistence.IsPresent, MultiBoot.IsPresent, callback);
 
             if (result == 0) WriteObject(loc["status_done"]);
             else WriteError(new ErrorRecord(new Exception("Write failed"), "WriteError", ErrorCategory.WriteError, TargetDrive));
+        }
+    }
+
+    [Cmdlet(VerbsCommon.Get, "Pxe4th")]
+    public class PxeCommand : PSCmdlet
+    {
+        [Parameter(Mandatory = true, Position = 0, HelpMessage = "Path to the ISO file to serve")]
+        public string IsoPath { get; set; }
+
+        protected override void ProcessRecord()
+        {
+            WriteObject($"Starting PXE Server for {IsoPath}...");
+            CoreEngineWrapper.ProgressCallback callback = (percentage, speed, remaining, temp, healthy) => { };
+            CoreEngineWrapper.StartPxeServer(IsoPath, callback);
+            WriteObject("PXE Server stopped.");
         }
     }
 
@@ -98,12 +113,18 @@ namespace diskform4th.CLI
         public delegate void ProgressCallback(int percentage, double speedMbPs, int remainingSeconds, int temperature, bool healthy);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        public static extern int WriteIsoAsync(string target, string isoPath, bool isIsoMode, bool smartMonitor, bool verifyBlocks, bool preLoadRam, bool secureErase, bool encryptSpace, bool persistence, ProgressCallback callback);
+        public static extern int WriteIsoAsync(string target, string isoPath, bool isIsoMode, bool smartMonitor, bool verifyBlocks, bool preLoadRam, bool secureErase, bool encryptSpace, bool persistence, bool multiBoot, ProgressCallback callback);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         public static extern int FormatDisk(string target, bool quick, ProgressCallback callback);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         public static extern int StartPxeServer(string isoPath, ProgressCallback callback);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        public static extern int InjectWin11Bypass(string target, ProgressCallback callback);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        public static extern int BackupDriveAsync(string sourceDrive, string targetImagePath, ProgressCallback callback);
     }
 }

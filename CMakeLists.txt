@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Platform specific configurations
 find_package(OpenCL REQUIRED)
+find_package(ZLIB REQUIRED)
 
 if (CMAKE_SYSTEM_NAME MATCHES "Linux")
     find_package(PkgConfig REQUIRED)
@@ -17,6 +18,8 @@ add_library(diskform4th_core SHARED src/core/io_buffer.cpp src/core/c_api.cpp)
 target_include_directories(diskform4th_core PUBLIC src/core)
 target_include_directories(diskform4th_core PUBLIC ${OpenCL_INCLUDE_DIRS})
 target_link_libraries(diskform4th_core PUBLIC ${OpenCL_LIBRARIES})
+target_include_directories(diskform4th_core PUBLIC ${ZLIB_INCLUDE_DIRS})
+target_link_libraries(diskform4th_core PUBLIC ${ZLIB_LIBRARIES})
 
 if (CMAKE_SYSTEM_NAME MATCHES "Linux")
     target_link_libraries(diskform4th_core PUBLIC ${LIBURING_LIBRARIES})

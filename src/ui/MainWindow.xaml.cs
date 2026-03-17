@@ -73,11 +73,39 @@ namespace diskform4th.UI
             LocalizationManager.Instance.SetLanguage("tr");
         }
 
+        private bool _win11BypassRequested = false;
+
         private void SelectIsoButton_Click(object sender, RoutedEventArgs e)
         {
-            // Placeholder: Open file dialog
-            IsoPathTextBox.Text = "ubuntu.iso";
-            IsoPathTextBox.Foreground = System.Windows.Media.Brushes.White;
+            var openFileDialog = new Microsoft.Win32.OpenFileDialog();
+            openFileDialog.Filter = "Disk Images (*.iso;*.vhdx;*.vhd;*.vmdk)|*.iso;*.vhdx;*.vhd;*.vmdk|All files (*.*)|*.*";
+            openFileDialog.Title = "Select Boot Image";
+
+            if (openFileDialog.ShowDialog() == true)
+            {
+                IsoPathTextBox.Text = openFileDialog.FileName;
+                IsoPathTextBox.Foreground = System.Windows.Media.Brushes.White;
+                CheckForWindows11Bypass(openFileDialog.FileName);
+            }
+        }
+
+        private void CheckForWindows11Bypass(string isoName)
+        {
+            _win11BypassRequested = false;
+            if (isoName.Contains("Win11", System.StringComparison.OrdinalIgnoreCase) || isoName.Contains("Windows11", System.StringComparison.OrdinalIgnoreCase))
+            {
+                var result = MessageBox.Show(
+                    "Windows 11 image detected.\n\nWould you like to automatically inject a bypass for TPM, RAM, and Secure Boot restrictions during the burn process?",
+                    "Remove Windows 11 Restrictions",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    _win11BypassRequested = true;
+                    StatusTextBlock.Text = "Win11 Bypass queued for burn phase.";
+                }
+            }
         }
 
         private async void FetchIsoButton_Click(object sender, RoutedEventArgs e)
@@ -123,6 +151,94 @@ namespace diskform4th.UI
             }
         }
 
+        private async void BackupButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (DeviceComboBox.SelectedIndex < 0 || AvailableDrives.Count == 0 || AvailableDrives[0] == "No Removable Drives Found")
+            {
+                MessageBox.Show(LocalizedStrings["error_no_drive"], "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            var saveFileDialog = new Microsoft.Win32.SaveFileDialog();
+            saveFileDialog.Filter = "Compressed Disk Image (*.img.gz)|*.img.gz";
+            saveFileDialog.Title = "Save Reverse Clone Backup";
+            saveFileDialog.FileName = "backup.img.gz";
+
+            if (saveFileDialog.ShowDialog() != true)
+            {
+                return;
+            }
+
+            string savePath = saveFileDialog.FileName;
+
+            StatusTextBlock.Text = $"Backing up drive to {savePath}...";
+            StartButton.IsEnabled = false;
+            BackupButton.IsEnabled = false;
+            if (PxeServerButton != null) PxeServerButton.IsEnabled = false;
+
+            string selectedDevice = DeviceComboBox.SelectedItem.ToString();
+            string target = selectedDevice.Split(" - ")[0];
+
+            ProgressCallback callback = (percentage, speed, remaining, temp, healthy) =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    WriteProgressBar.Value = percentage;
+                    SpeedTextBlock.Text = $"{speed:F1} MB/s";
+                    SpeedTextBlock.Foreground = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#0078D7"));
+                    TimeSpan time = TimeSpan.FromSeconds(remaining);
+                    TimeTextBlock.Text = $"Remaining: {time.Minutes:D2}:{time.Seconds:D2}";
+                });
+            };
+
+            await Task.Run(() =>
+            {
+                CoreInterop.BackupDriveAsync(target, savePath, callback);
+            });
+
+            StatusTextBlock.Text = "Backup Complete.";
+            SpeedTextBlock.Text = "0 MB/s";
+            StartButton.IsEnabled = true;
+            BackupButton.IsEnabled = true;
+            if (PxeServerButton != null) PxeServerButton.IsEnabled = true;
+        }
+
+        private async void PxeServerButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (IsoPathTextBox.Text == "SELECT ISO IMAGE..." || string.IsNullOrEmpty(IsoPathTextBox.Text))
+            {
+                MessageBox.Show(LocalizedStrings["error_no_iso"], "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            StatusTextBlock.Text = "Starting PXE Server...";
+            if (PxeServerButton != null) PxeServerButton.IsEnabled = false;
+            StartButton.IsEnabled = false;
+            BackupButton.IsEnabled = false;
+
+            ProgressCallback callback = (percentage, speed, remaining, temp, healthy) =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    WriteProgressBar.Value = percentage;
+                    SpeedTextBlock.Text = "PXE SERVING";
+                    SpeedTextBlock.Foreground = System.Windows.Media.Brushes.MediumPurple;
+                });
+            };
+
+            string iso = IsoPathTextBox.Text;
+
+            await Task.Run(() =>
+            {
+                CoreInterop.StartPxeServer(iso, callback);
+            });
+
+            StatusTextBlock.Text = "PXE Server Stopped.";
+            if (PxeServerButton != null) PxeServerButton.IsEnabled = true;
+            StartButton.IsEnabled = true;
+            BackupButton.IsEnabled = true;
+        }
+
         private async void StartButton_Click(object sender, RoutedEventArgs e)
         {
             if (IsoPathTextBox.Text == "SELECT ISO IMAGE..." || string.IsNullOrEmpty(IsoPathTextBox.Text))
@@ -139,6 +255,8 @@ namespace diskform4th.UI
 
             StatusTextBlock.Text = LocalizedStrings["status_burning"];
             StartButton.IsEnabled = false;
+            if (PxeServerButton != null) PxeServerButton.IsEnabled = false;
+            BackupButton.IsEnabled = false;
 
             // Extract physical drive path from selection (e.g. "\\.\PhysicalDrive1 - E:\ (32.0 GB)" -> "\\.\PhysicalDrive1")
             string selectedDevice = DeviceComboBox.SelectedItem.ToString();
@@ -176,19 +294,33 @@ namespace diskform4th.UI
 
             // Run core engine function asynchronously
             string iso = IsoPathTextBox.Text;
-            bool isIsoMode = ImageModeComboBox.SelectedIndex == 0;
+            bool isIsoMode = ImageModeComboBox.SelectedIndex == 0 || ImageModeComboBox.SelectedIndex == 2; // Treat Multi-Boot as an ISO mode extension
+            bool isMultiBoot = ImageModeComboBox.SelectedIndex == 2;
             bool verify = VerifyCheckBox.IsChecked ?? false;
+            bool preLoadRam = PreloadRamCheckBox.IsChecked ?? false;
+            bool secureErase = SecureEraseCheckBox.IsChecked ?? false;
+            bool encryptSpace = EncryptSpaceCheckBox.IsChecked ?? false;
+            bool persistence = PersistenceCheckBox.IsChecked ?? false;
 
             await Task.Run(() =>
             {
                 // Call C-API via P/Invoke with the callback
-                CoreInterop.WriteIsoAsync(target, iso, isIsoMode, true, verify, callback);
+                CoreInterop.WriteIsoAsync(target, iso, isIsoMode, true, verify, preLoadRam, secureErase, encryptSpace, persistence, isMultiBoot, callback);
+
+                // Perform Win11 injection natively after the main burn process completes
+                if (_win11BypassRequested)
+                {
+                    Dispatcher.Invoke(() => { StatusTextBlock.Text = "Injecting Win11 Bypasses..."; });
+                    CoreInterop.InjectWin11Bypass(target, callback);
+                }
             });
 
             StatusTextBlock.Text = LocalizedStrings["status_done"];
             SpeedTextBlock.Text = "0 MB/s";
             TimeTextBlock.Text = "Remaining: 00:00";
             StartButton.IsEnabled = true;
+            if (PxeServerButton != null) PxeServerButton.IsEnabled = true;
+            BackupButton.IsEnabled = true;
         }
     }
 
@@ -198,9 +330,18 @@ namespace diskform4th.UI
         private const string DllName = "diskform4th_core.dll";
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        public static extern int WriteIsoAsync(string target, string isoPath, bool isIsoMode, bool smartMonitor, bool verifyBlocks, MainWindow.ProgressCallback callback);
+        public static extern int WriteIsoAsync(string target, string isoPath, bool isIsoMode, bool smartMonitor, bool verifyBlocks, bool preLoadRam, bool secureErase, bool encryptSpace, bool persistence, bool multiBoot, MainWindow.ProgressCallback callback);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         public static extern int FormatDisk(string target, bool quick, MainWindow.ProgressCallback callback);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        public static extern int StartPxeServer(string isoPath, MainWindow.ProgressCallback callback);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        public static extern int InjectWin11Bypass(string target, MainWindow.ProgressCallback callback);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        public static extern int BackupDriveAsync(string sourceDrive, string targetImagePath, MainWindow.ProgressCallback callback);
     }
 }
