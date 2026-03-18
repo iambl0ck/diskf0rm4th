@@ -8,6 +8,7 @@ using System.Linq;
 using System.Collections.ObjectModel;
 using System.Net.Http;
 using System.Windows.Controls;
+using System.Windows.Threading;
 
 namespace diskform4th.UI
 {
@@ -17,7 +18,29 @@ namespace diskform4th.UI
 
         // Define delegate for progress callback
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        public delegate void ProgressCallback(int percentage, double speedMbPs, int remainingSeconds, int temperature, bool healthy);
+        public delegate void ProgressCallback(int percentage, double speedMbPs, int remainingSeconds, int temperature, bool healthy, [MarshalAs(UnmanagedType.LPStr)] string hashStr);
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+        public struct SecurityConfig
+        {
+            [MarshalAs(UnmanagedType.LPStr)] public string outer_pass;
+            [MarshalAs(UnmanagedType.LPStr)] public string inner_pass;
+            public bool enable_hidden_vol;
+        }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+        public struct ProgressData
+        {
+            public int percentage;
+            public double speedMbPs;
+            public int remainingSeconds;
+            public int temperature;
+            public bool healthy;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+            public string hashStr;
+        }
+
+        private DispatcherTimer _pollTimer;
 
         public MainWindow()
         {
@@ -25,6 +48,37 @@ namespace diskform4th.UI
             DataContext = this;
             LocalizationManager.Instance.LanguageChanged += OnLanguageChanged;
             LoadDrives();
+
+            _pollTimer = new DispatcherTimer();
+            _pollTimer.Interval = TimeSpan.FromMilliseconds(50);
+            _pollTimer.Tick += PollTimer_Tick;
+        }
+
+        private void PollTimer_Tick(object? sender, EventArgs e)
+        {
+            ProgressData data = new ProgressData();
+            while (CoreInterop.PollProgress(ref data))
+            {
+                WriteProgressBar.Value = data.percentage;
+                if (data.speedMbPs == -1.5) {
+                    SpeedTextBlock.Text = "QR READY";
+                    SpeedTextBlock.Foreground = System.Windows.Media.Brushes.LightGreen;
+                    if (!string.IsNullOrEmpty(data.hashStr)) {
+                        MessageBox.Show($"Validation Hash:\n{data.hashStr}", "Air-Gapped Validation Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                    } else {
+                        MessageBox.Show("QR Validation Payload", "Air-Gapped Validation QR", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                } else if (data.speedMbPs < 0.0) {
+                    SpeedTextBlock.Text = "PROCESSING...";
+                    SpeedTextBlock.Foreground = System.Windows.Media.Brushes.MediumPurple;
+                } else {
+                    SpeedTextBlock.Text = $"{data.speedMbPs:F1} MB/s";
+                    SpeedTextBlock.Foreground = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#0078D7"));
+                }
+
+                TimeSpan time = TimeSpan.FromSeconds(data.remainingSeconds);
+                TimeTextBlock.Text = $"Remaining: {time.Minutes:D2}:{time.Seconds:D2}";
+            }
         }
 
         private void LoadDrives()
@@ -179,7 +233,7 @@ namespace diskform4th.UI
             string selectedDevice = DeviceComboBox.SelectedItem.ToString();
             string target = selectedDevice.Split(" - ")[0];
 
-            ProgressCallback callback = (percentage, speed, remaining, temp, healthy) =>
+            ProgressCallback callback = (percentage, speed, remaining, temp, healthy, hashStr) =>
             {
                 Dispatcher.Invoke(() =>
                 {
@@ -216,7 +270,7 @@ namespace diskform4th.UI
             StartButton.IsEnabled = false;
             BackupButton.IsEnabled = false;
 
-            ProgressCallback callback = (percentage, speed, remaining, temp, healthy) =>
+            ProgressCallback callback = (percentage, speed, remaining, temp, healthy, hashStr) =>
             {
                 Dispatcher.Invoke(() =>
                 {
@@ -263,7 +317,7 @@ namespace diskform4th.UI
             string target = selectedDevice.Split(" - ")[0];
 
             // Define the callback
-            ProgressCallback callback = (percentage, speed, remaining, temp, healthy) =>
+            ProgressCallback callback = (percentage, speed, remaining, temp, healthy, hashStr) =>
             {
                 // Marshal back to UI thread
                 Dispatcher.Invoke(() =>
@@ -299,7 +353,12 @@ namespace diskform4th.UI
                         "  ██          ██  ██    ██████  ██    ████  ████  \n" +
                         "  ██████████████  ██████████  ████  ████  ████    \n";
 
-                        MessageBox.Show(qr, "Air-Gapped Validation QR", MessageBoxButton.OK, MessageBoxImage.Information);
+                        if (!string.IsNullOrEmpty(hashStr)) {
+                            // Instead of a console ASCII block, UI renders hash here.
+                            MessageBox.Show($"Validation Hash:\n{hashStr}", "Air-Gapped Validation Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                        } else {
+                            MessageBox.Show(qr, "Air-Gapped Validation QR", MessageBoxButton.OK, MessageBoxImage.Information);
+                        }
                     } else if (speed < 0.0) {
                         // Special signal for Verification phase
                         SpeedTextBlock.Text = "VERIFYING...";
@@ -333,26 +392,35 @@ namespace diskform4th.UI
             bool persistence = PersistenceCheckBox.IsChecked ?? false;
             bool lockDrive = LockDriveCheckBox.IsChecked ?? false;
 
+            _pollTimer.Start();
+
             await Task.Run(() =>
             {
-                // Call C-API via P/Invoke with the callback
-                CoreInterop.WriteIsoAsync(target, iso, isIsoMode, true, verify, preLoadRam, secureErase, encryptSpace, persistence, isMultiBoot, callback);
+                SecurityConfig secConfig = new SecurityConfig {
+                    outer_pass = "outer",
+                    inner_pass = "inner",
+                    enable_hidden_vol = encryptSpace
+                };
+
+                // Call C-API via P/Invoke with null callback to rely purely on polling
+                CoreInterop.WriteIsoAsync(target, iso, isIsoMode, true, verify, preLoadRam, secureErase, encryptSpace, persistence, isMultiBoot, ref secConfig, null);
 
                 // Perform Win11 injection natively after the main burn process completes
                 if (_win11BypassRequested)
                 {
                     Dispatcher.Invoke(() => { StatusTextBlock.Text = "Injecting Win11 Bypasses..."; });
-                    CoreInterop.InjectWin11Bypass(target, callback);
+                    CoreInterop.InjectWin11Bypass(target, null);
                 }
 
                 // Lock drive firmly as the final step via SCSI passthrough
                 if (lockDrive)
                 {
                     Dispatcher.Invoke(() => { StatusTextBlock.Text = "Locking Drive (Read-Only)..."; });
-                    CoreInterop.LockDriveReadOnly(target, callback);
+                    CoreInterop.LockDriveReadOnly(target, null);
                 }
             });
 
+            _pollTimer.Stop();
             StatusTextBlock.Text = LocalizedStrings["status_done"];
             SpeedTextBlock.Text = "0 MB/s";
             TimeTextBlock.Text = "Remaining: 00:00";
@@ -368,21 +436,24 @@ namespace diskform4th.UI
         private const string DllName = "diskform4th_core.dll";
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        public static extern int WriteIsoAsync(string target, string isoPath, bool isIsoMode, bool smartMonitor, bool verifyBlocks, bool preLoadRam, bool secureErase, bool encryptSpace, bool persistence, bool multiBoot, MainWindow.ProgressCallback callback);
+        public static extern bool PollProgress(ref MainWindow.ProgressData outData);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        public static extern int FormatDisk(string target, bool quick, MainWindow.ProgressCallback callback);
+        public static extern int WriteIsoAsync(string target, string isoPath, bool isIsoMode, bool smartMonitor, bool verifyBlocks, bool preLoadRam, bool secureErase, bool encryptSpace, bool persistence, bool multiBoot, ref MainWindow.SecurityConfig secConfig, MainWindow.ProgressCallback? callback);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        public static extern int StartPxeServer(string isoPath, MainWindow.ProgressCallback callback);
+        public static extern int FormatDisk(string target, bool quick, MainWindow.ProgressCallback? callback);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        public static extern int InjectWin11Bypass(string target, MainWindow.ProgressCallback callback);
+        public static extern int StartPxeServer(string isoPath, MainWindow.ProgressCallback? callback);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        public static extern int BackupDriveAsync(string sourceDrive, string targetImagePath, MainWindow.ProgressCallback callback);
+        public static extern int InjectWin11Bypass(string target, MainWindow.ProgressCallback? callback);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        public static extern int LockDriveReadOnly(string target, MainWindow.ProgressCallback callback);
+        public static extern int BackupDriveAsync(string sourceDrive, string targetImagePath, MainWindow.ProgressCallback? callback);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        public static extern int LockDriveReadOnly(string target, MainWindow.ProgressCallback? callback);
     }
 }

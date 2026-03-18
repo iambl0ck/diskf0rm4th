@@ -23,7 +23,7 @@ namespace diskform4th.CLI
 
             WriteObject($"{loc["status_formatting"]} {DriveLetter}...");
 
-            CoreEngineWrapper.ProgressCallback callback = (percentage, speed, remaining, temp, healthy) =>
+            CoreEngineWrapper.ProgressCallback callback = (percentage, speed, remaining, temp, healthy, hashStr) =>
             {
                 if (percentage % 25 == 0)
                 {
@@ -74,7 +74,7 @@ namespace diskform4th.CLI
 
             WriteObject($"{loc["status_burning"]} {IsoPath} -> {TargetDrive}...");
 
-            CoreEngineWrapper.ProgressCallback callback = (percentage, speed, remaining, temp, healthy) =>
+            CoreEngineWrapper.ProgressCallback callback = (percentage, speed, remaining, temp, healthy, hashStr) =>
             {
                 if (percentage % 25 == 0)
                 {
@@ -82,7 +82,13 @@ namespace diskform4th.CLI
                 }
             };
 
-            int result = CoreEngineWrapper.WriteIsoAsync(TargetDrive, IsoPath, false, SmartMonitor.IsPresent, false, PreloadRam.IsPresent, SecureErase.IsPresent, EncryptSpace.IsPresent, Persistence.IsPresent, MultiBoot.IsPresent, callback);
+            CoreEngineWrapper.SecurityConfig secConfig = new CoreEngineWrapper.SecurityConfig {
+                outer_pass = "outer",
+                inner_pass = "inner",
+                enable_hidden_vol = EncryptSpace.IsPresent
+            };
+
+            int result = CoreEngineWrapper.WriteIsoAsync(TargetDrive, IsoPath, false, SmartMonitor.IsPresent, false, PreloadRam.IsPresent, SecureErase.IsPresent, EncryptSpace.IsPresent, Persistence.IsPresent, MultiBoot.IsPresent, ref secConfig, callback);
 
             if (result == 0) WriteObject(loc["status_done"]);
             else WriteError(new ErrorRecord(new Exception("Write failed"), "WriteError", ErrorCategory.WriteError, TargetDrive));
@@ -98,7 +104,7 @@ namespace diskform4th.CLI
         protected override void ProcessRecord()
         {
             WriteObject($"Starting PXE Server for {IsoPath}...");
-            CoreEngineWrapper.ProgressCallback callback = (percentage, speed, remaining, temp, healthy) => { };
+            CoreEngineWrapper.ProgressCallback callback = (percentage, speed, remaining, temp, healthy, hashStr) => { };
             CoreEngineWrapper.StartPxeServer(IsoPath, callback);
             WriteObject("PXE Server stopped.");
         }
@@ -110,10 +116,18 @@ namespace diskform4th.CLI
         private const string DllName = "diskform4th_core.dll";
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        public delegate void ProgressCallback(int percentage, double speedMbPs, int remainingSeconds, int temperature, bool healthy);
+        public delegate void ProgressCallback(int percentage, double speedMbPs, int remainingSeconds, int temperature, bool healthy, [MarshalAs(UnmanagedType.LPStr)] string hashStr);
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+        public struct SecurityConfig
+        {
+            [MarshalAs(UnmanagedType.LPStr)] public string outer_pass;
+            [MarshalAs(UnmanagedType.LPStr)] public string inner_pass;
+            public bool enable_hidden_vol;
+        }
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        public static extern int WriteIsoAsync(string target, string isoPath, bool isIsoMode, bool smartMonitor, bool verifyBlocks, bool preLoadRam, bool secureErase, bool encryptSpace, bool persistence, bool multiBoot, ProgressCallback callback);
+        public static extern int WriteIsoAsync(string target, string isoPath, bool isIsoMode, bool smartMonitor, bool verifyBlocks, bool preLoadRam, bool secureErase, bool encryptSpace, bool persistence, bool multiBoot, ref SecurityConfig secConfig, ProgressCallback callback);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         public static extern int FormatDisk(string target, bool quick, ProgressCallback callback);
