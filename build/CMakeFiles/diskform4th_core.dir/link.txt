@@ -1,1 +1,0 @@
-/usr/bin/c++ -fPIC  -mrdrnd -shared -Wl,-soname,libdiskform4th_core.so -o libdiskform4th_core.so CMakeFiles/diskform4th_core.dir/src/core/io_buffer.cpp.o CMakeFiles/diskform4th_core.dir/src/core/c_api.cpp.o  /usr/lib/x86_64-linux-gnu/libOpenCL.so -lzstd -luring

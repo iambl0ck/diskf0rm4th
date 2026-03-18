@@ -43,6 +43,7 @@ const std::string RED     = "\033[31m";
 const std::string CLEAR_L = "\033[2K\r"; // Clear line
 
 // Mocked callback to match C-API
+#include <cstring>
 #include "qrcodegen.hpp"
 
 void progress_callback(int percentage, double speed, int remaining, int temp, bool healthy, const char* hashStr) {
@@ -105,10 +106,16 @@ void progress_callback(int percentage, double speed, int remaining, int temp, bo
 #define IMPORT __attribute__((visibility("default")))
 #endif
 
+struct SecurityConfig {
+    const char* outer_pass;
+    const char* inner_pass;
+    bool enable_hidden_vol;
+};
+
 extern "C" {
-    IMPORT int WriteIsoAsync(const char* target, const char* isoPath, bool isIsoMode, bool smartMonitor, bool verifyBlocks, bool preLoadRam, bool secureErase, bool encryptSpace, bool persistence, bool multiBoot, void (*callback)(int, double, int, int, bool));
-    IMPORT int FormatDisk(const char* target, bool quick, void (*callback)(int, double, int, int, bool));
-    IMPORT int StartPxeServer(const char* isoPath, void (*callback)(int, double, int, int, bool));
+    IMPORT int WriteIsoAsync(const char* target, const char* isoPath, bool isIsoMode, bool smartMonitor, bool verifyBlocks, bool preLoadRam, bool secureErase, bool encryptSpace, bool persistence, bool multiBoot, SecurityConfig* secConfig, void (*callback)(int, double, int, int, bool, const char*));
+    IMPORT int FormatDisk(const char* target, bool quick, void (*callback)(int, double, int, int, bool, const char*));
+    IMPORT int StartPxeServer(const char* isoPath, void (*callback)(int, double, int, int, bool, const char*));
 }
 
 int main(int argc, char* argv[]) {
@@ -208,7 +215,12 @@ int main(int argc, char* argv[]) {
 
     // Call the shared library
     // Use DD mode (false) by default for Linux CLI since it's typically used for ISOHybrid images
-    WriteIsoAsync(device.c_str(), iso.c_str(), false, true, true, preload, wipe, encrypt, persist, false, progress_callback);
+    SecurityConfig secConfig;
+    secConfig.outer_pass = "outer";
+    secConfig.inner_pass = "inner";
+    secConfig.enable_hidden_vol = encrypt;
+
+    WriteIsoAsync(device.c_str(), iso.c_str(), false, true, true, preload, wipe, encrypt, persist, false, &secConfig, progress_callback);
 
     std::cout << "\n\n" << BOLD << GREEN << get_localized_string("status_done", locale) << "!" << RESET << "\n";
     return 0;

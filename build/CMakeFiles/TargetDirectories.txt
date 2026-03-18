@@ -1,4 +1,0 @@
-/app/build/CMakeFiles/diskform4th_core.dir
-/app/build/CMakeFiles/diskform4th_cli.dir
-/app/build/CMakeFiles/edit_cache.dir
-/app/build/CMakeFiles/rebuild_cache.dir
