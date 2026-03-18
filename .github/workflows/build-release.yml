@@ -9,7 +9,7 @@ jobs:
   build-windows:
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
@@ -31,7 +31,7 @@ jobs:
       run: cmake --build build --config Release --target diskform4th_core
 
     - name: Setup .NET 8.0
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '8.0.x'
 
@@ -44,7 +44,7 @@ jobs:
       run: copy build\Release\diskform4th_core.dll publish_windows\
 
     - name: Upload Windows Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: diskform4th-windows-x64
         path: publish_windows/*
@@ -52,7 +52,7 @@ jobs:
   build-linux:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Install Dependencies
       run: |
@@ -72,7 +72,7 @@ jobs:
         cp build/diskform4th_cli publish_linux/
 
     - name: Upload Linux Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: diskform4th-linux-x64
         path: publish_linux/*
@@ -82,13 +82,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Download Windows Artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: diskform4th-windows-x64
         path: windows
 
     - name: Download Linux Artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: diskform4th-linux-x64
         path: linux
