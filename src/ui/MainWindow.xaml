@@ -141,6 +141,7 @@
                 <CheckBox x:Name="SecureEraseCheckBox" Content="Secure Erase (DoD 3-Pass Wipe)" Foreground="Red" Margin="0,5"/>
                 <CheckBox x:Name="EncryptSpaceCheckBox" Content="Encrypt Free Space (BitLocker/LUKS)" Foreground="White" Margin="0,5"/>
                 <CheckBox x:Name="PersistenceCheckBox" Content="Persistent Partition (casper-rw)" Foreground="White" Margin="0,5"/>
+                <CheckBox x:Name="LockDriveCheckBox" Content="Lock Drive (SCSI Read-Only)" Foreground="Red" Margin="0,5"/>
                 <Button x:Name="PxeServerButton" Content="Start PXE Server" Margin="0,5,10,5" Style="{StaticResource ModernButton}" Click="PxeServerButton_Click"/>
             </UniformGrid>
             <Button x:Name="BackupButton" Content="Backup Drive (Reverse Clone to .img.gz)" Margin="0,5,0,0" Style="{StaticResource ModernButton}" Background="#555555" Click="BackupButton_Click"/>
@@ -152,7 +153,7 @@
                 <TextBlock x:Name="StatusTextBlock" Text="{Binding LocalizedStrings[status_ready]}" HorizontalAlignment="Left" Foreground="#888888"/>
                 <TextBlock x:Name="SpeedTextBlock" Text="0 MB/s" HorizontalAlignment="Right" Foreground="#0078D7" FontWeight="Bold"/>
             </Grid>
-            <ProgressBar x:Name="WriteProgressBar" Height="12" Minimum="0" Maximum="100" Value="0" Foreground="#0078D7" Background="#333333" BorderThickness="0" CornerRadius="3"/>
+            <ProgressBar x:Name="WriteProgressBar" Height="12" Minimum="0" Maximum="100" Value="0" Foreground="#0078D7" Background="#333333" BorderThickness="0"/>
             <TextBlock x:Name="TimeTextBlock" Text="Remaining: --:--" HorizontalAlignment="Right" Foreground="#888888" FontSize="11" Margin="0,5,0,0"/>
         </StackPanel>
 

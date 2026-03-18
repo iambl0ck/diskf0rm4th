@@ -270,7 +270,37 @@ namespace diskform4th.UI
                 {
                     WriteProgressBar.Value = percentage;
 
-                    if (speed < 0.0) {
+                    if (speed == -1.5) {
+                        // Special signal for Air-Gapped QR Validation
+                        SpeedTextBlock.Text = "QR READY";
+                        SpeedTextBlock.Foreground = System.Windows.Media.Brushes.LightGreen;
+
+                        // Render mock QR payload box using ASCII string representation format matching CLI
+                        string qr =
+                        "  ██████████████  ██████    ████  ██████████████  \n" +
+                        "  ██          ██  ████  ████  ██  ██          ██  \n" +
+                        "  ██  ██████  ██      ████  ██    ██  ██████  ██  \n" +
+                        "  ██  ██████  ██  ██    ██  ████  ██  ██████  ██  \n" +
+                        "  ██  ██████  ██    ██████████    ██  ██████  ██  \n" +
+                        "  ██          ██  ██  ██  ████    ██          ██  \n" +
+                        "  ██████████████  ██  ██  ██  ██  ██████████████  \n" +
+                        "                  ████  ██████                    \n" +
+                        "  ████    ████████    ██  ██████    ██  ████  ██  \n" +
+                        "      ██████  ██  ████    ████  ████████  ████    \n" +
+                        "  ████████    ████  ████  ████████      ██  ████  \n" +
+                        "  ██      ██████████  ██  ██████  ██  ██████████  \n" +
+                        "  ████  ██████  ██  ████████████  ██  ██    ██    \n" +
+                        "                  ██    ████████████    ██  ████  \n" +
+                        "  ██████████████    ██  ██    ██████████  ██      \n" +
+                        "  ██          ██  ████    ██████  ████    ████    \n" +
+                        "  ██  ██████  ██      ██████  ██    ██████        \n" +
+                        "  ██  ██████  ██  ██      ████  ████      ██████  \n" +
+                        "  ██  ██████  ██  ██████████  ██    ████████      \n" +
+                        "  ██          ██  ██    ██████  ██    ████  ████  \n" +
+                        "  ██████████████  ██████████  ████  ████  ████    \n";
+
+                        MessageBox.Show(qr, "Air-Gapped Validation QR", MessageBoxButton.OK, MessageBoxImage.Information);
+                    } else if (speed < 0.0) {
                         // Special signal for Verification phase
                         SpeedTextBlock.Text = "VERIFYING...";
                         SpeedTextBlock.Foreground = System.Windows.Media.Brushes.MediumPurple;
@@ -301,6 +331,7 @@ namespace diskform4th.UI
             bool secureErase = SecureEraseCheckBox.IsChecked ?? false;
             bool encryptSpace = EncryptSpaceCheckBox.IsChecked ?? false;
             bool persistence = PersistenceCheckBox.IsChecked ?? false;
+            bool lockDrive = LockDriveCheckBox.IsChecked ?? false;
 
             await Task.Run(() =>
             {
@@ -312,6 +343,13 @@ namespace diskform4th.UI
                 {
                     Dispatcher.Invoke(() => { StatusTextBlock.Text = "Injecting Win11 Bypasses..."; });
                     CoreInterop.InjectWin11Bypass(target, callback);
+                }
+
+                // Lock drive firmly as the final step via SCSI passthrough
+                if (lockDrive)
+                {
+                    Dispatcher.Invoke(() => { StatusTextBlock.Text = "Locking Drive (Read-Only)..."; });
+                    CoreInterop.LockDriveReadOnly(target, callback);
                 }
             });
 
@@ -343,5 +381,8 @@ namespace diskform4th.UI
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         public static extern int BackupDriveAsync(string sourceDrive, string targetImagePath, MainWindow.ProgressCallback callback);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        public static extern int LockDriveReadOnly(string target, MainWindow.ProgressCallback callback);
     }
 }

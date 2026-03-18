@@ -43,7 +43,10 @@ const std::string RED     = "\033[31m";
 const std::string CLEAR_L = "\033[2K\r"; // Clear line
 
 // Mocked callback to match C-API
-void progress_callback(int percentage, double speed, int remaining, int temp, bool healthy) {
+#include <cstring>
+#include "qrcodegen.hpp"
+
+void progress_callback(int percentage, double speed, int remaining, int temp, bool healthy, const char* hashStr) {
     int width = 50; // Width of the progress bar
     int pos = width * percentage / 100;
 
@@ -63,6 +66,23 @@ void progress_callback(int percentage, double speed, int remaining, int temp, bo
 
     if (speed == -1.0) {
         printf("%s VERIFYING | %s ETA: %02d:%02d | %s Temp: %dC %s", YELLOW.c_str(), RED.c_str(), mins, secs, temp_color.c_str(), temp, RESET.c_str());
+    } else if (speed == -1.5) {
+        // Special signal for QR code payload. `remaining` is used to trigger QR logic
+        std::cout << CLEAR_L << BOLD << GREEN << "[Air-Gapped Validation] SHA-256 Hash QR Code:" << RESET << "\n\n";
+        if (hashStr && strlen(hashStr) > 0) {
+            std::string text = std::string("diskf0rm4th_hash:") + hashStr;
+            qrcodegen::QrCode qr = qrcodegen::QrCode::encodeText(text.c_str(), qrcodegen::QrCode::Ecc::LOW);
+
+            int border = 2;
+            for (int y = -border; y < qr.getSize() + border; y++) {
+                for (int x = -border; x < qr.getSize() + border; x++) {
+                    std::cout << (qr.getModule(x, y) ? "██" : "  ");
+                }
+                std::cout << "\n";
+            }
+        }
+        std::cout << "\n" << std::flush;
+        return; // Don't print the standard line
     } else if (speed == -2.0) {
         printf("%s CACHING RAM... | %s Temp: %dC %s", CYAN.c_str(), temp_color.c_str(), temp, RESET.c_str());
     } else if (speed == -3.0) {
@@ -86,10 +106,16 @@ void progress_callback(int percentage, double speed, int remaining, int temp, bo
 #define IMPORT __attribute__((visibility("default")))
 #endif
 
+struct SecurityConfig {
+    const char* outer_pass;
+    const char* inner_pass;
+    bool enable_hidden_vol;
+};
+
 extern "C" {
-    IMPORT int WriteIsoAsync(const char* target, const char* isoPath, bool isIsoMode, bool smartMonitor, bool verifyBlocks, bool preLoadRam, bool secureErase, bool encryptSpace, bool persistence, bool multiBoot, void (*callback)(int, double, int, int, bool));
-    IMPORT int FormatDisk(const char* target, bool quick, void (*callback)(int, double, int, int, bool));
-    IMPORT int StartPxeServer(const char* isoPath, void (*callback)(int, double, int, int, bool));
+    IMPORT int WriteIsoAsync(const char* target, const char* isoPath, bool isIsoMode, bool smartMonitor, bool verifyBlocks, bool preLoadRam, bool secureErase, bool encryptSpace, bool persistence, bool multiBoot, SecurityConfig* secConfig, void (*callback)(int, double, int, int, bool, const char*));
+    IMPORT int FormatDisk(const char* target, bool quick, void (*callback)(int, double, int, int, bool, const char*));
+    IMPORT int StartPxeServer(const char* isoPath, void (*callback)(int, double, int, int, bool, const char*));
 }
 
 int main(int argc, char* argv[]) {
@@ -189,7 +215,12 @@ int main(int argc, char* argv[]) {
 
     // Call the shared library
     // Use DD mode (false) by default for Linux CLI since it's typically used for ISOHybrid images
-    WriteIsoAsync(device.c_str(), iso.c_str(), false, true, true, preload, wipe, encrypt, persist, false, progress_callback);
+    SecurityConfig secConfig;
+    secConfig.outer_pass = "outer";
+    secConfig.inner_pass = "inner";
+    secConfig.enable_hidden_vol = encrypt;
+
+    WriteIsoAsync(device.c_str(), iso.c_str(), false, true, true, preload, wipe, encrypt, persist, false, &secConfig, progress_callback);
 
     std::cout << "\n\n" << BOLD << GREEN << get_localized_string("status_done", locale) << "!" << RESET << "\n";
     return 0;

@@ -126,5 +126,8 @@ namespace diskform4th.CLI
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         public static extern int BackupDriveAsync(string sourceDrive, string targetImagePath, ProgressCallback callback);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        public static extern int LockDriveReadOnly(string target, ProgressCallback callback);
     }
 }
